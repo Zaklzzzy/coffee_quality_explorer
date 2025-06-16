@@ -1,4 +1,6 @@
 import streamlit as st
+import plotly.express as px
+import numpy as np
 from repository.database import fetch_df
 from services.analytics import compute_kpi, predict_score
 from services.projection import tsne_3d, umap_3d
@@ -12,9 +14,9 @@ countries = fetch_df(
     "SELECT DISTINCT country_of_origin FROM arabica ORDER BY 1"
 ).squeeze().tolist()
 
-country = st.sidebar.selectbox("Country", ["All"] + countries)
+country = st.sidebar.selectbox("Страна", ["All"] + countries)
 process = st.sidebar.selectbox(
-    "Processing method",
+    "Способ обработки",
     ["All"] + fetch_df(
         "SELECT DISTINCT processing_method FROM arabica WHERE processing_method IS NOT NULL"
     ).squeeze().tolist()
@@ -44,29 +46,76 @@ with tab_overview:
 
 with tab_cluster:
     st.subheader("Кластеризация")
-    method = st.selectbox("Метод проекции", ["t-SNE", "UMAP"])
-    emb_df = tsne_3d(df) if method == "t-SNE" else umap_3d(df)
-    emb_df["country"] = df["country_of_origin"].values
+    if len(df) < 3:
+        st.info("Нужно ≥ 3 образцов для проекции. Расширьте фильтр.")
+        st.stop()
+    else:
+        method = st.selectbox("Метод проекции", ["t-SNE", "UMAP"])
+        try:
+            emb_df = tsne_3d(df) if method == "t-SNE" else umap_3d(df)
+            emb_df["country"] = df["country_of_origin"].values
 
-    fig = st.plotly_chart(
-        __import__("plotly.express").express.scatter_3d(
-            emb_df, x="x", y="y", z="z",
-            color="country",
-            size_max=6,
-            opacity=0.7,
-            height=600,
-        ),
-        use_container_width=True
-    )
+            lot_repr = np.where(
+                df["lot_number"].isna(),
+                "ID_" + df.index.astype(str),
+                df["lot_number"].astype(str)
+            )
+            emb_df["label"] = (
+                lot_repr
+                + " · "
+                + df["farm_name"].fillna("").astype(str)
+                + " · "
+                + df["total_cup_points"].round(1).astype(str)
+            )
+            emb_df["score"]  = df["total_cup_points"].round(1)
+            emb_df["method"] = df["processing_method"].fillna("Unknown")
+
+            fig = px.scatter_3d(
+                emb_df,
+                x="x", y="y", z="z",
+                color="country",
+                hover_name="label",
+                hover_data={
+                    "country": True,
+                    "score":  True,
+                    "method": True
+                },
+                opacity=0.7,
+                height=600,
+            )
+            fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
+            st.plotly_chart(fig, use_container_width=True)
+        except ValueError as e:
+            st.warning(str(e))
 
 with tab_detail:
     st.subheader("Детальный просмотр образца")
-    sample = st.selectbox("ID образца", df.index)
-    row = df.loc[sample]
+    if df.empty:
+        st.info("Нет данных для отображения.")
+        st.stop()
+
+    lot_repr = np.where(
+        df["lot_number"].isna(),
+        "ID_" + df.index.astype(str),
+        df["lot_number"].astype(str)
+    )
+
+    df["label"] = (
+        lot_repr
+        + " · "
+        + df["farm_name"].fillna("").astype(str)
+        + " · "
+        + df["total_cup_points"].round(1).astype(str)
+    )
+
+    sample_label = st.selectbox("Выберите образец", df["label"])
+    row = df.loc[df["label"] == sample_label].squeeze()
+
     spider_chart(row)
 
-    st.markdown("##### What-if")
-    aroma   = st.slider("Aroma",   0.0, 10.0, float(row["aroma"]),   0.25)
-    acidity = st.slider("Acidity", 0.0, 10.0, float(row["acidity"]), 0.25)
+    st.markdown("##### What-if / Что будет, если")
+    aroma   = st.slider("Аромат (Aroma)",   0.0, 10.0, float(row["aroma"]),   0.25)
+    acidity = st.slider("Кислотность (Acidity)", 0.0, 10.0, float(row["acidity"]), 0.25)
     predicted = predict_score(row, aroma, acidity)
-    st.metric("Прогноз оценки", predicted, delta=predicted - row["total_cup_points"])
+    delta = predicted - row["total_cup_points"]
+    st.metric("Прогноз оценки", f"{predicted:.2f}", delta=f"{delta:+.2f}")
