@@ -1,0 +1,7 @@
+streamlit==1.45.1
+pandas==2.3.0
+plotly==6.1.2
+scikit-learn==1.7.0
+umap-learn==0.5.7
+altair==5.5.0
+SQLAlchemy==2.0.41
