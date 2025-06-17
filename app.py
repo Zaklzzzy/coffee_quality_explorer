@@ -37,7 +37,7 @@ if where:
 df = fetch_df(sql, tuple(params))
 
 # Tabs
-tab_overview, tab_cluster, tab_detail = st.tabs(["Overview", "Clusters", "Sample detail"])
+tab_overview, tab_cluster, tab_detail = st.tabs(["Обзор", "Кластеры", "Подробная выборка"])
 
 with tab_overview:
     st.subheader("Обзор выборки")
