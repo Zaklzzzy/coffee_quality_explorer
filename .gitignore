@@ -13,7 +13,6 @@ venv/
 *~
 
 .streamlit/secrets.toml     
-**/.streamlit/config.toml   
 .cache/
 
 .ipynb_checkpoints/

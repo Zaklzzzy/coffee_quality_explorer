@@ -1,0 +1,10 @@
+[server]
+headless      = true
+maxUploadSize = 10
+port          = 8501
+
+[theme]
+base            = "light"
+primaryColor    = "#A47148" 
+backgroundColor = "#faf9f7"
+secondaryBackgroundColor = "#ffffff"
